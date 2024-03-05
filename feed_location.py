@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 # Load pre-trained YOLO model
-net = cv2.dnn.readNet("yolov3.weights", "yolov3.cfg")
+net = cv2.dnn.readNet("yolov4-tiny.weights", "yolov4-tiny.cfg")
 
 # Load COCO class labels
 classes = []

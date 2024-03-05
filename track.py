@@ -2,8 +2,8 @@ import cv2
 import numpy as np
 
 # Load pre-trained object detection model (e.g., YOLO)
-model_config = "path/to/model/config.cfg"
-model_weights = "path/to/model/weights.weights"
+model_config = "yolov4-tiny.cfg"
+model_weights = "yolov4-tiny.weights"
 net = cv2.dnn.readNet(model_weights, model_config)
 
 # Get output layer names
