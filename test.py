@@ -56,6 +56,9 @@ with open("coco.names", "r") as f:
 layer_names = net.getLayerNames()
 output_layers = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 
+# Stereo vision depth estimation parameters
+stereo = cv2.StereoBM_create(numDisparities=16, blockSize=15)
+
 # Main loop
 try:
     while True:
@@ -64,8 +67,14 @@ try:
         right_frame = process_frame(right_sink, None)
         
         # Perform stereo vision depth estimation
-        # Your code for stereo vision depth estimation goes here
+        left_gray = cv2.cvtColor(left_frame, cv2.COLOR_BGR2GRAY)
+        right_gray = cv2.cvtColor(right_frame, cv2.COLOR_BGR2GRAY)
+        disparity = stereo.compute(left_gray, right_gray)
         
+        # Normalize disparity map for visualization
+        depth_map = (disparity / 16.0).astype(np.float32)
+        depth_map = cv2.normalize(depth_map, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+
         # Perform YOLOv4 Tiny object detection on the left frame
         blob = cv2.dnn.blobFromImage(left_frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
         net.setInput(blob)
@@ -79,12 +88,23 @@ try:
                 confidence = scores[class_id]
                 if confidence > 0.5:
                     # Object detected, process further
-                    # Extract bounding box information and project onto 3D space using depth map
-                    # Your code for mapping 2D bounding boxes to 3D space goes here
+                    center_x = int(detection[0] * 640)
+                    center_y = int(detection[1] * 480)
+                    w = int(detection[2] * 640)
+                    h = int(detection[3] * 480)
+                    
+                    x = int(center_x - w / 2)
+                    y = int(center_y - h / 2)
+                    
+                    # Calculate depth (distance) of the object using depth map
+                    depth = depth_map[y:y+h, x:x+w].mean()  # Use mean depth value of the bounding box region
+                    # Perform mapping to 3D space using camera calibration parameters and stereo geometry
+                    # Mapping code goes here
         
         # Display frames
         cv2.imshow('Left Camera', left_frame)
         cv2.imshow('Right Camera', right_frame)
+        cv2.imshow('Depth Map', depth_map)
         
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
