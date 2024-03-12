@@ -112,7 +112,7 @@ class STREAM:
 
                     for frame in [left_image,right_image]:
                         outs = outs_r
-                        if frame[0] == left_image[0]:
+                        if (frame == left_image).all():
                             outs=outs_l
                         for out in outs:
                             for detection in out:
