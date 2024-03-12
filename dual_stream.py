@@ -106,10 +106,10 @@ class STREAM:
                     class_ids = []
 
                     for frame in [left_image,right_image]:
-			outs = outs_r
-			if frame==left_image:
-				outs=outs_l
-			for out in outs:
+                        outs = outs_r
+                        if frame==left_image:
+                            outs=outs_l
+                        for out in outs:
                             for detection in out:
                                 scores = detection[5:]
                                 class_id = np.argmax(scores)
