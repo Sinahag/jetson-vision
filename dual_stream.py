@@ -91,9 +91,14 @@ class STREAM:
                     _, right_image = right_camera.read()
 
                     # Create a blob from the frame and perform a forward pass through the network
-                    blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (self.input_size, self.input_size), swapRB=True, crop=False)
+                    blob = cv2.dnn.blobFromImage(left_image, 1 / 255.0, (self.input_size, self.input_size), swapRB=True, crop=False)
                     self.net.setInput(blob)
-                    outs = self.net.forward(get_output_layers(self.net))
+                    outs_l = self.net.forward(get_output_layers(self.net))
+
+                    # Create a blob from the frame and perform a forward pass through the network
+                    blob = cv2.dnn.blobFromImage(right_image, 1 / 255.0, (self.input_size, self.input_size), swapRB=True, crop=False)
+                    self.net.setInput(blob)
+                    outs_r = self.net.forward(get_output_layers(self.net))
 
                     # Initialize lists for detected objects
                     boxes = []
@@ -101,8 +106,10 @@ class STREAM:
                     class_ids = []
 
                     for frame in [left_image,right_image]:
-                            # Process detection outputs
-                        for out in outs:
+			outs = outs_r
+			if frame==left_image:
+				outs=outs_l
+			for out in outs:
                             for detection in out:
                                 scores = detection[5:]
                                 class_id = np.argmax(scores)
