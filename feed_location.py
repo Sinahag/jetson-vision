@@ -14,7 +14,11 @@ input_size = 416
 confidence_threshold = 0.5
 
 # Initialize camera capture using GStreamer
-camera = cv2.VideoCapture("nvarguscamerasrc sensor_id=0 ! video/x-raw(memory:NVMM), width=(int)1280, height=(int)720, format=(string)NV12, framerate=(fraction)30/1 ! nvvidconv ! video/x-raw, format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink")
+camera = cv2.VideoCapture("nvarguscamerasrc sensor_id=0 ! \
+                          video/x-raw(memory:NVMM), width=(int)1280, \
+                          height=(int)720, format=(string)NV12, framerate=(fraction)30/1 \
+                          ! nvvidconv ! video/x-raw, format=(string)BGRx ! videoconvert ! \
+                          video/x-raw, format=(string)BGR ! appsink")
 
 # Check if camera opened successfully
 if not camera.isOpened():
