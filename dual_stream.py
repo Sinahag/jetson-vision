@@ -37,6 +37,11 @@ def gstreamer_pipeline(
         )
     )
 
+def get_output_layers(net):
+    layer_names = net.getLayerNames()
+    output_layers = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
+    return output_layers
+
 class STREAM:
     def __init__(self):
         self.confidence_threshold=0.5
