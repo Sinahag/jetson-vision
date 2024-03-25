@@ -7,6 +7,7 @@ gray1=0
 # Termination criteria for corner detection
 criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
+
 # Arrays to store object points and image points from all images
 object_points = []  # 3D points in real world space
 image_points1 = []  # 2D points in image plane for camera 1
