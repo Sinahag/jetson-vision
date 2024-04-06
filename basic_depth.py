@@ -29,74 +29,36 @@ while True:
     frame2 = cv2.resize(frame2, None, fx=0.4, fy=0.4)
     
     # Detect objects in frame1
-    height, width, channels = frame1.shape
     blob1 = cv2.dnn.blobFromImage(frame1, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
     net.setInput(blob1)
     outs1 = net.forward(output_layers)
 
-    # Get object information from frame1
-    class_ids1 = []
-    confidences1 = []
-    boxes1 = []
-    for out in outs1:
-        for detection in out:
-            scores = detection[5:]
-            class_id = np.argmax(scores)
-            confidence = scores[class_id]
-            if confidence > 0.5:
-                center_x = int(detection[0] * width)
-                center_y = int(detection[1] * height)
-                w = int(detection[2] * width)
-                h = int(detection[3] * height)
-                x = int(center_x - w / 2)
-                y = int(center_y - h / 2)
-                class_ids1.append(class_id)
-                confidences1.append(float(confidence))
-                boxes1.append([x, y, w, h])
-
     # Detect objects in frame2
-    height, width, channels = frame2.shape
     blob2 = cv2.dnn.blobFromImage(frame2, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
     net.setInput(blob2)
     outs2 = net.forward(output_layers)
 
-    # Get object information from frame2
-    class_ids2 = []
-    confidences2 = []
-    boxes2 = []
-    for out in outs2:
-        for detection in out:
-            scores = detection[5:]
-            class_id = np.argmax(scores)
-            confidence = scores[class_id]
-            if confidence > 0.5:
-                center_x = int(detection[0] * width)
-                center_y = int(detection[1] * height)
-                w = int(detection[2] * width)
-                h = int(detection[3] * height)
-                x = int(center_x - w / 2)
-                y = int(center_y - h / 2)
-                class_ids2.append(class_id)
-                confidences2.append(float(confidence))
-                boxes2.append([x, y, w, h])
-
     # Match objects between frames based on class and proximity
     matches = []
-    for i in range(len(boxes1)):
-        for j in range(len(boxes2)):
-            if class_ids1[i] == class_ids2[j]:
+    for i, detection1 in enumerate(outs1):
+        for j, detection2 in enumerate(outs2):
+            scores1 = detection1[5:]
+            class_id1 = np.argmax(scores1)
+            confidence1 = scores1[class_id1]
+            scores2 = detection2[5:]
+            class_id2 = np.argmax(scores2)
+            confidence2 = scores2[class_id2]
+            if class_id1 == class_id2 and confidence1 > 0.5 and confidence2 > 0.5:
                 # Calculate distance between centroids
-                centroid1 = (boxes1[i][0] + boxes1[i][2] / 2, boxes1[i][1] + boxes1[i][3] / 2)
-                centroid2 = (boxes2[j][0] + boxes2[j][2] / 2, boxes2[j][1] + boxes2[j][3] / 2)
+                centroid1 = (detection1[0] * frame1.shape[1], detection1[1] * frame1.shape[0])
+                centroid2 = (detection2[0] * frame2.shape[1], detection2[1] * frame2.shape[0])
                 distance = np.sqrt((centroid1[0] - centroid2[0])**2 + (centroid1[1] - centroid2[1])**2)
                 if distance < 50:  # Adjust this threshold as needed
-                    matches.append((i, j))
+                    matches.append((centroid1, centroid2))
 
     # Calculate and print the distance of each matched object from the cameras
     for match in matches:
-        idx1, idx2 = match
-        centroid1 = (boxes1[idx1][0] + boxes1[idx1][2] / 2, boxes1[idx1][1] + boxes1[idx1][3] / 2)
-        centroid2 = (boxes2[idx2][0] + boxes2[idx2][2] / 2, boxes2[idx2][1] + boxes2[idx2][3] / 2)
+        centroid1, centroid2 = match
         distance_px = abs(centroid1[0] - centroid2[0])
         print("Distance from cameras:", distance_px)
 
