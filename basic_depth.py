@@ -10,8 +10,25 @@ layer_names = net.getLayerNames()
 output_layers = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 
 # Initialize cameras
-cam1 = cv2.VideoCapture("v4l2src device=/dev/video0 ! video/x-raw, format=BGRx ! videoconvert ! appsink", cv2.CAP_GSTREAMER)
-cam2 = cv2.VideoCapture("v4l2src device=/dev/video1 ! video/x-raw, format=BGRx ! videoconvert ! appsink", cv2.CAP_GSTREAMER)
+pipeline0 = " ! ".join(["v4l2src device=/dev/video0",
+                       "video/x-raw, width=320, height=240, framerate=30/1",
+                       "videoconvert",
+                       "video/x-raw, format=(string)BGR",
+                       "appsink"
+                       ])
+
+pipeline1 = " ! ".join(["v4l2src device=/dev/video1",
+                       "video/x-raw, width=320, height=240, framerate=30/1",
+                       "videoconvert",
+                       "video/x-raw, format=(string)BGR",
+                       "appsink"
+                       ])
+
+#cam1 = cv2.VideoCapture(pipeline0, cv2.CAP_GSTREAMER)
+#cam2 = cv2.VideoCapture(pipeline1, cv2.CAP_GSTREAMER)
+
+cam1= cv2.VideoCapture(0)
+cam2= cv2.VideoCapture(1)
 
 while True:
     # Capture frame from camera 1
@@ -25,10 +42,12 @@ while True:
         break
 
     # Resize frames for faster processing
-    frame1 = cv2.resize(frame1, None, fx=0.4, fy=0.4)
-    frame2 = cv2.resize(frame2, None, fx=0.4, fy=0.4)
+    #frame1 = cv2.resize(frame1, None, fx=0.4, fy=0.4)
+    #frame2 = cv2.resize(frame2, None, fx=0.4, fy=0.4)
     
-    # Detect objects in frame1
+    print("bing")
+
+    # Detect objects in frame1S
     height, width, channels = frame1.shape
     blob1 = cv2.dnn.blobFromImage(frame1, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
     net.setInput(blob1)
@@ -102,7 +121,7 @@ while True:
 
     # Display frames with detected objects
     cv2.imshow("Frame1", frame1)
-    cv2.imshow("Frame2", frame2)
+    #cv2.imshow("Frame2", frame2)
     
     # Press 'q' to exit
     if cv2.waitKey(1) & 0xFF == ord('q'):
