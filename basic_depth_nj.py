@@ -1,37 +1,49 @@
 import cv2
 import numpy as np
 
-# Load pre-trained YOLO model
+def list_ports():
+    """
+    Test the ports and returns a tuple with the available ports 
+    and the ones that are working.
+    """
+    is_working = True
+    dev_port = 0
+    working_ports = []
+    available_ports = []
+    while is_working:
+        camera = cv2.VideoCapture(dev_port)
+        if not camera.isOpened():
+            is_working = False
+            print("Port %s is not working." %dev_port)
+        else:
+            is_reading, img = camera.read()
+            w = camera.get(3)
+            h = camera.get(4)
+            if is_reading:
+                print("Port %s is working and reads images (%s x %s)" %(dev_port,h,w))
+                working_ports.append(dev_port)
+            else:
+                print("Port %s for camera ( %s x %s) is present but does not reads." %(dev_port,h,w))
+                available_ports.append(dev_port)
+        dev_port +=1
+    return available_ports,working_ports
+
+print(list_ports())
+
+# Load pre-trained YOLOv4-tiny model
 net = cv2.dnn.readNet("yolov4-tiny.weights", "yolov4-tiny.cfg")
 classes = []
 with open("coco.names", "r") as f:
     classes = [line.strip() for line in f.readlines()]
 layer_names = net.getLayerNames()
-output_layers = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
+output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
 
 # Initialize cameras
-pipeline0 = " ! ".join(["v4l2src device=/dev/video0",
-                       "video/x-raw, width=320, height=240, framerate=30/1",
-                       "videoconvert",
-                       "video/x-raw, format=(string)BGR",
-                       "appsink"
-                       ])
-
-pipeline1 = " ! ".join(["v4l2src device=/dev/video1",
-                       "video/x-raw, width=320, height=240, framerate=30/1",
-                       "videoconvert",
-                       "video/x-raw, format=(string)BGR",
-                       "appsink"
-                       ])
-
-#cam1 = cv2.VideoCapture(pipeline0, cv2.CAP_GSTREAMER)
-#cam2 = cv2.VideoCapture(pipeline1, cv2.CAP_GSTREAMER)
-
-cam1= cv2.VideoCapture(0)
-cam2= cv2.VideoCapture(1)
+cam1 = cv2.VideoCapture(0)
+cam2 = cv2.VideoCapture(1)
 
 while True:
-    # Capture frame from camera 1
+    # Capture frame from camera 1 
     ret1, frame1 = cam1.read()
     if not ret1:
         break
@@ -42,18 +54,20 @@ while True:
         break
 
     # Resize frames for faster processing
-    #frame1 = cv2.resize(frame1, None, fx=0.4, fy=0.4)
-    #frame2 = cv2.resize(frame2, None, fx=0.4, fy=0.4)
+    frame1 = cv2.resize(frame1, None, fx=0.4, fy=0.4)
+    frame2 = cv2.resize(frame2, None, fx=0.4, fy=0.4)
     
-    print("bing")
-
-    # Detect objects in frame1S
-    height, width, channels = frame1.shape
-    blob1 = cv2.dnn.blobFromImage(frame1, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
+    # Perform object detection on frame1
+    blob1 = cv2.dnn.blobFromImage(frame1, 1/255.0, (416, 416), swapRB=True, crop=False)
     net.setInput(blob1)
     outs1 = net.forward(output_layers)
 
-    # Get object information from frame1
+    # Perform object detection on frame2
+    blob2 = cv2.dnn.blobFromImage(frame2, 1/255.0, (416, 416), swapRB=True, crop=False)
+    net.setInput(blob2)
+    outs2 = net.forward(output_layers)
+
+    # Process detections for frame1
     class_ids1 = []
     confidences1 = []
     boxes1 = []
@@ -63,23 +77,17 @@ while True:
             class_id = np.argmax(scores)
             confidence = scores[class_id]
             if confidence > 0.5:
-                center_x = int(detection[0] * width)
-                center_y = int(detection[1] * height)
-                w = int(detection[2] * width)
-                h = int(detection[3] * height)
+                center_x = int(detection[0] * frame1.shape[1])
+                center_y = int(detection[1] * frame1.shape[0])
+                w = int(detection[2] * frame1.shape[1])
+                h = int(detection[3] * frame1.shape[0])
                 x = int(center_x - w / 2)
                 y = int(center_y - h / 2)
                 class_ids1.append(class_id)
                 confidences1.append(float(confidence))
                 boxes1.append([x, y, w, h])
 
-    # Detect objects in frame2
-    height, width, channels = frame2.shape
-    blob2 = cv2.dnn.blobFromImage(frame2, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
-    net.setInput(blob2)
-    outs2 = net.forward(output_layers)
-
-    # Get object information from frame2
+    # Process detections for frame2
     class_ids2 = []
     confidences2 = []
     boxes2 = []
@@ -89,10 +97,10 @@ while True:
             class_id = np.argmax(scores)
             confidence = scores[class_id]
             if confidence > 0.5:
-                center_x = int(detection[0] * width)
-                center_y = int(detection[1] * height)
-                w = int(detection[2] * width)
-                h = int(detection[3] * height)
+                center_x = int(detection[0] * frame2.shape[1])
+                center_y = int(detection[1] * frame2.shape[0])
+                w = int(detection[2] * frame2.shape[1])
+                h = int(detection[3] * frame2.shape[0])
                 x = int(center_x - w / 2)
                 y = int(center_y - h / 2)
                 class_ids2.append(class_id)
@@ -121,7 +129,7 @@ while True:
 
     # Display frames with detected objects
     cv2.imshow("Frame1", frame1)
-    #cv2.imshow("Frame2", frame2)
+    cv2.imshow("Frame2", frame2)
     
     # Press 'q' to exit
     if cv2.waitKey(1) & 0xFF == ord('q'):
