@@ -1,118 +1,90 @@
-import gi
-gi.require_version('Gst', '1.0')
-from gi.repository import GObject, Gst
+import numpy
 import cv2
-import numpy as np
 
-GObject.threads_init()
-Gst.init(None)
+window_title = "Person Detect"
 
-# Define GStreamer pipeline for stereo vision
-pipeline_str = (
-    "nvarguscamerasrc sensor-id=0 ! "
-    "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, format=(string)NV12, framerate=(fraction)30/1 ! "
-    "nvvidconv ! video/x-raw, format=(string)BGRx ! "
-    "videoconvert ! video/x-raw, format=(string)BGR ! appsink name=left_sink sync=false "
-    
-    "nvarguscamerasrc sensor-id=1 ! "
-    "video/x-raw(memory:NVMM), width=(int)640, height=(int)480, format=(string)NV12, framerate=(fraction)30/1 ! "
-    "nvvidconv ! video/x-raw, format=(string)BGRx ! "
-    "videoconvert ! video/x-raw, format=(string)BGR ! appsink name=right_sink sync=false "
-)
+pipeline0 = " ! ".join(["v4l2src device=/dev/video0",
+                       "video/x-raw, width=640, height=480, framerate=30/1",
+                       "videoconvert",
+                       "video/x-raw, format=(string)BGR",
+                       "appsink"
+                       ])
+pipeline1 = " ! ".join(["v4l2src device=/dev/video1",
+                       "video/x-raw, width=640, height=480, framerate=30/1",
+                       "videoconvert",
+                       "video/x-raw, format=(string)BGR",
+                       "appsink"
+                       ])
 
-pipeline = Gst.parse_launch(pipeline_str)
 
-# Get sink elements
-left_sink = pipeline.get_by_name('left_sink')
-right_sink = pipeline.get_by_name('right_sink')
 
-# Define callback function to process frames
-def process_frame(sink, data):
-    sample = sink.emit("pull-sample")
-    buf = sample.get_buffer()
-    caps = sample.get_caps()
-    array = np.ndarray(
-        (caps.get_structure(0).get_value("height"),
-         caps.get_structure(0).get_value("width"),
-         3),
-        buffer=buf.extract_dup(0, buf.get_size()),
-        dtype=np.uint8)
-    return array
+def person_detect():
+    body_cascade = cv2.CascadeClassifier(
+        "/usr/share/opencv4/haarcascades/haarcascade_upperbody.xml"
+    )
 
-# Set callbacks for left and right sinks
-left_sink.set_property('emit-signals', True)
-left_sink.connect('new-sample', process_frame, left_sink)
-right_sink.set_property('emit-signals', True)
-right_sink.connect('new-sample', process_frame, right_sink)
+    video_capture0 = cv2.VideoCapture(pipeline0, cv2.CAP_GSTREAMER)
+    video_capture1 = cv2.VideoCapture(pipeline1, cv2.CAP_GSTREAMER)
+    frame_width = 640
 
-# Start pipeline
-pipeline.set_state(Gst.State.PLAYING)
+    """ 
+    # Select frame size, FPS:
+    video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    video_capture.set(cv2.CAP_PROP_FPS, 30)
+    """
 
-# Load YOLOv4 Tiny model
-net = cv2.dnn.readNet("yolov4-tiny.weights", "yolov4-tiny.cfg")
-classes = []
-with open("coco.names", "r") as f:
-    classes = [line.strip() for line in f.readlines()]
-layer_names = net.getLayerNames()
-output_layers = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
-
-# Stereo vision depth estimation parameters
-stereo = cv2.StereoBM_create(numDisparities=16, blockSize=15)
-
-# Main loop
-try:
-    while True:
-        # Capture frames from left and right cameras
-        left_frame = process_frame(left_sink, None)
-        right_frame = process_frame(right_sink, None)
-        
-        # Perform stereo vision depth estimation
-        left_gray = cv2.cvtColor(left_frame, cv2.COLOR_BGR2GRAY)
-        right_gray = cv2.cvtColor(right_frame, cv2.COLOR_BGR2GRAY)
-        disparity = stereo.compute(left_gray, right_gray)
-        
-        # Normalize disparity map for visualization
-        depth_map = (disparity / 16.0).astype(np.float32)
-        depth_map = cv2.normalize(depth_map, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-
-        # Perform YOLOv4 Tiny object detection on the left frame
-        blob = cv2.dnn.blobFromImage(left_frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
-        net.setInput(blob)
-        outs = net.forward(output_layers)
-        
-        # Process detections
-        for out in outs:
-            for detection in out:
-                scores = detection[5:]
-                class_id = np.argmax(scores)
-                confidence = scores[class_id]
-                if confidence > 0.5:
-                    # Object detected, process further
-                    center_x = int(detection[0] * 640)
-                    center_y = int(detection[1] * 480)
-                    w = int(detection[2] * 640)
-                    h = int(detection[3] * 480)
+    if video_capture0.isOpened() and video_capture1.isOpened():
+        try:
+            cv2.namedWindow(window_title, cv2.WINDOW_AUTOSIZE)
+            while True:
+                _, frame0 = video_capture0.read()
+                _, frame1 = video_capture1.read()
+                gray0 = cv2.cvtColor(frame0, cv2.COLOR_BGR2GRAY)
+                faces0 = body_cascade.detectMultiScale(gray0, 1.3, 5)
+                gray1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
+                faces1 = body_cascade.detectMultiScale(gray1, 1.3, 5)
+		
+                pairs=[]
+		
+                for (x, y, w, h) in faces0:
+                    pairs.append([x,w])
+                    cv2.rectangle(frame0, (x, y), (x + w, y + h), (255, 0, 0), 2)
                     
-                    x = int(center_x - w / 2)
-                    y = int(center_y - h / 2)
-                    
-                    # Calculate depth (distance) of the object using depth map
-                    depth = depth_map[y:y+h, x:x+w].mean()  # Use mean depth value of the bounding box region
-                    # Perform mapping to 3D space using camera calibration parameters and stereo geometry
-                    # Mapping code goes here
-        
-        # Display frames
-        cv2.imshow('Left Camera', left_frame)
-        cv2.imshow('Right Camera', right_frame)
-        cv2.imshow('Depth Map', depth_map)
-        
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+                for (x, y, w, h) in faces1:
+                    pairs.append([x,w])
+                    cv2.rectangle(frame1, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
-except KeyboardInterrupt:
-    pass
+                if(len(pairs)>0 and len(pairs)%2==0):
+                    x_diff = pairs[1][0]-pairs[0][0]
+                    w_diff = pairs[1][1]-pairs[0][1] 
+                    x_loc = x_diff/2 + pairs[1][0]
+                    depth_meter = 290/x_diff
+                    x_mean = x_diff/2+pairs[1][0]
+                    x_offset = x_mean - frame_width/2
+                    print(x_offset)
+                    angle = x_offset/10.6
+                    print(f"Angle: {angle}")
+                    print(f"Distance: {depth_meter}")
+                    print(x_diff,w_diff)
 
-finally:
-    # Stop pipeline
-    pipeline.set_state(Gst.State.NULL)
-    cv2.destroyAllWindows()
+                if cv2.getWindowProperty(window_title, cv2.WND_PROP_AUTOSIZE) >= 0:
+                    cv2.imshow(window_title+"_right", frame0)
+                    cv2.imshow(window_title+"_left",frame1)
+                else:
+                    break
+                
+                keyCode = cv2.waitKey(30) & 0xFF
+                # Stop the program on the ESC key or 'q'
+                if keyCode == 27 or keyCode == ord('q'):
+                    break
+        finally:
+            video_capture0.release()
+            video_capture1.release()
+            cv2.destroyAllWindows()
+    else:
+        print("Unable to open camera")
+
+
+if __name__ == "__main__":
+    person_detect()
