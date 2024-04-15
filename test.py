@@ -1,7 +1,13 @@
 import numpy
 import cv2
+import serial
+import struct
 
 window_title = "Person Detect"
+
+serial_port = '/dev/ttyTHS1'
+baud_rate=9600
+ser = serial.Serial(serial_port,baud_rate,timeout=1)
 
 pipeline0 = " ! ".join(["v4l2src device=/dev/video0",
                        "video/x-raw, width=640, height=480, framerate=30/1",
@@ -59,14 +65,16 @@ def person_detect():
                     x_diff = pairs[1][0]-pairs[0][0]
                     w_diff = pairs[1][1]-pairs[0][1] 
                     x_loc = x_diff/2 + pairs[1][0]
-                    depth_meter = 290/x_diff
+                    depth = int((270/x_diff)*10) # in 1/10 centimeteres
                     x_mean = x_diff/2+pairs[1][0]
                     x_offset = x_mean - frame_width/2
-                    print(x_offset)
-                    angle = x_offset/10.6
+                    angle = int(x_offset/8)
                     print(f"Angle: {angle}")
-                    print(f"Distance: {depth_meter}")
-                    print(x_diff,w_diff)
+                    print(f"Distance: {depth*10}")
+                    # send the angle with a 30 pt increase (avoid sending negatives)
+                    scaled_angle = angle+30 
+                    packet = depth.to_bytes(1,byteorder="big")+scaled_angle.to_bytes(1,byteorder="big")
+                    ser.write(packet)
 
                 if cv2.getWindowProperty(window_title, cv2.WND_PROP_AUTOSIZE) >= 0:
                     cv2.imshow(window_title+"_right", frame0)
@@ -79,6 +87,7 @@ def person_detect():
                 if keyCode == 27 or keyCode == ord('q'):
                     break
         finally:
+            ser.close()
             video_capture0.release()
             video_capture1.release()
             cv2.destroyAllWindows()
