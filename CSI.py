@@ -6,7 +6,7 @@ window_title = "Person Detect"
 
 serial_port = '/dev/ttyTHS1'
 baud_rate = 9600
-ser = serial.Serial(serial_port, baud_rate, timeout=1)
+#ser = serial.Serial(serial_port, baud_rate, timeout=1)
 
 def gstreamer_pipeline(
     sensor_id=0,
@@ -87,7 +87,7 @@ def person_detect():
                     # send the angle with a 30 pt increase (avoid sending negatives)
                     scaled_angle = angle + 30
                     packet = depth.to_bytes(1, byteorder="big") + scaled_angle.to_bytes(1, byteorder="big")
-                    ser.write(packet)
+                    #ser.write(packet)
 
                 if cv2.getWindowProperty(window_title, cv2.WND_PROP_AUTOSIZE) >= 0:
                     cv2.imshow(window_title + "_right", frame0)
@@ -100,7 +100,7 @@ def person_detect():
                 if keyCode == 27 or keyCode == ord('q'):
                     break
         finally:
-            ser.close()
+            #ser.close()
             video_capture0.release()
             video_capture1.release()
             cv2.destroyAllWindows()
