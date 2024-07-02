@@ -111,13 +111,29 @@ void person_detect() {
                 Mat frame1 = frame_queue1.back().first.clone();
 
                 // Draw rectangles around detected bodies
-                vector<Rect> faces0 = frame_queue0.back().second;
-                vector<Rect> faces1 = frame_queue1.back().second;
-                for (const auto& rect : faces0) {
+                vector<Rect> bodies0 = frame_queue0.back().second;
+                vector<Rect> bodies1 = frame_queue1.back().second;
+                vector<pair<int, int>> pairs;
+
+                for (const auto& rect : bodies0) {
+                    pairs.push_back({rect.x, rect.width});
                     rectangle(frame0, rect, Scalar(255, 0, 0), 2);
                 }
-                for (const auto& rect : faces1) {
+                for (const auto& rect : bodies1) {
+                    pairs.push_back({rect.x, rect.width});
                     rectangle(frame1, rect, Scalar(255, 0, 0), 2);
+                }
+
+                if (pairs.size() > 1 && pairs.size() % 2 == 0) {
+                    int x_diff = pairs[1].first - pairs[0].first;
+                    int w_diff = pairs[1].second - pairs[0].second;
+                    int x_loc = x_diff / 2 + pairs[1].first;
+                    int depth = int((270.0 / x_diff) * 10); // in 1/10 centimeters
+                    int x_mean = x_diff / 2 + pairs[1].first;
+                    int x_offset = x_mean - frame0.cols / 2;
+                    int angle = int(x_offset / 8);
+                    cout << "Angle: " << angle << endl;
+                    cout << "Distance: " << depth * 10 << " mm" << endl;
                 }
 
                 // Display frames in respective windows
