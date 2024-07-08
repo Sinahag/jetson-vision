@@ -2,7 +2,7 @@
 CXX = g++
 
 # Compiler flags
-CXXFLAGS = `pkg-config --cflags opencv4` -std=c++11 -pthread
+CXXFLAGS = `pkg-config --cflags opencv4` -std=c++11 -pthread -I/usr/include/opencv4
 
 # Linker flags
 LDFLAGS = `pkg-config --libs opencv4`
