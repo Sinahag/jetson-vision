@@ -170,7 +170,7 @@ while True:
                 x_mean = abs(centersL[i][1]) + x_diff/2
                 x_offset = x_mean - frame_width/2
                 angle = int(x_offset / 8)
-                print(str(centersL[i][0]) + " at: " +  str(int((270/x_diff)*10)) + "mm from launcher at: " + str(angle) + " degrees")
+                print(" person" + str(i) + " detected at: " +  str(int((270/x_diff)*10)) + "mm from launcher at: " + str(angle) + " degrees")
 
     cv.imshow("Object Detection Left", frameL)
     cv.imshow("Object Detection Right", frameR)
