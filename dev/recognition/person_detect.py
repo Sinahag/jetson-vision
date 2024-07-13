@@ -87,6 +87,7 @@ dist_coeffsR = np.zeros(5)
 R = np.eye(3)
 T = np.zeros((3, 1))
 R1, R2, P1, P2, Q = [np.eye(3) for _ in range(5)]
+frame_width = 720
 
 while True:
     retL, frameL = capL.read()
@@ -102,13 +103,13 @@ while True:
     net.setInput(blobR)
     outsR = net.forward(get_output_names(net))
 
-    conf_threshold = 0.5
+    conf_threshold = 0.5 # minimum confidence for detected object to be drawn around
     nms_threshold = 0.4
     frame_heightL, frame_widthL = frameL.shape[:2]
     frame_heightR, frame_widthR = frameR.shape[:2]
 
-    class_idsL, confidencesL, boxesL = [], [], []
-    class_idsR, confidencesR, boxesR = [], [], []
+    class_idsL, confidencesL, boxesL, centersL = [], [], [], []
+    class_idsR, confidencesR, boxesR, centersR= [], [], [], []
 
     # Process detections for left frame
     for out in outsL:
@@ -133,6 +134,7 @@ while True:
         for i in indicesL.flatten():
             box = boxesL[i]
             left, top, width, height = box
+            centersL.append([class_idsL[i],left+(width/2)])
             draw_pred(class_idsL[i], confidencesL[i], left, top, left + width, top + height, frameL, classes)
 
     # Process detections for right frame
@@ -158,7 +160,17 @@ while True:
         for i in indicesR:
             box = boxesR[i]
             left, top, width, height = box
+            centersR.append([class_idsR[i],left+(width/2)])
             draw_pred(class_idsR[i], confidencesR[i], left, top, left + width, top + height, frameR, classes)
+            
+    if len(centersR) > 0 and len(centersR) == len(centersL): # if the same number of objects detected in both frames
+        for i in range(len(centersL)):
+            if(centersL[i][0] == centersR[i][0]) and (centersL[i][0]==0): # checks if its the same object and if its a person
+                x_diff = abs(centersL[i][1]-centersR[i][1])
+                x_mean = abs(centersL[i][1]) + x_diff/2
+                x_offset = x_mean - frame_width/2
+                angle = int(x_offset / 8)
+                print(str(centersL[i][0]) + " at: " +  str(int((270/x_diff)*10)) + "mm from launcher at: " + str(angle) + " degrees")
 
     cv.imshow("Object Detection Left", frameL)
     cv.imshow("Object Detection Right", frameR)
