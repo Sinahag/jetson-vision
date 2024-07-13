@@ -1,5 +1,12 @@
 import cv2 as cv
 import numpy as np
+import serial
+import struct
+
+serial_port = '/dev/ttyTHS1'
+baud_rate=9600
+ser = serial.Serial(serial_port,baud_rate,timeout=1)
+
 
 # Load names of classes
 def get_output_names(net):
@@ -69,8 +76,8 @@ pipeline0 = gstreamer_pipeline(sensor_id=0)
 pipeline1 = gstreamer_pipeline(sensor_id=1)
 
 # Open video capture for two cameras
-capL = cv.VideoCapture(pipeline0, cv.CAP_GSTREAMER)
-capR = cv.VideoCapture(pipeline1, cv.CAP_GSTREAMER)
+capR = cv.VideoCapture(pipeline0, cv.CAP_GSTREAMER)
+capL = cv.VideoCapture(pipeline1, cv.CAP_GSTREAMER)
 
 if not capL.isOpened() or not capR.isOpened():
     print("Error: Could not open cameras.")
@@ -87,7 +94,7 @@ dist_coeffsR = np.zeros(5)
 R = np.eye(3)
 T = np.zeros((3, 1))
 R1, R2, P1, P2, Q = [np.eye(3) for _ in range(5)]
-frame_width = 720
+frame_width = 1280
 
 while True:
     retL, frameL = capL.read()
@@ -167,17 +174,24 @@ while True:
         for i in range(len(centersL)):
             if(centersL[i][0] == centersR[i][0]) and (centersL[i][0]==0): # checks if its the same object and if its a person
                 x_diff = abs(centersL[i][1]-centersR[i][1])
-                x_mean = abs(centersL[i][1]) + x_diff/2
-                x_offset = x_mean - frame_width/2
-                angle = int(x_offset / 8)
-                print(" person" + str(i) + " detected at: " +  str(int((270/x_diff)*10)) + "mm from launcher at: " + str(angle) + " degrees")
-
+                x_mean = centersR[i][1] + x_diff/2 - frame_width/2
+                depth = int((270/x_diff)*100)
+                angle = int(x_mean /16)
+                if(angle<-30):
+                    angle = -30
+                scaled_angle = angle+30 # scaling this to a positive number to transmit to bbg and then will be scaled down on bbg side
+                scaled_depth = int(depth/10)
+                print("person" + str(i) + " detected at: " +  str(depth) + "cm from launcher at: " + str(angle) + " degrees")
+                packet = scaled_depth.to_bytes(1,byteorder="big") +scaled_angle.to_bytes(1,byteorder="big")
+                ser.write(packet)
+                
     cv.imshow("Object Detection Left", frameL)
     cv.imshow("Object Detection Right", frameR)
 
     if cv.waitKey(1) >= 0:
         break
 
+ser.close()
 capL.release()
 capR.release()
 cv.destroyAllWindows()
