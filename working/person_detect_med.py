@@ -176,12 +176,12 @@ while True:
                 draw_pred(class_idsR[i], confidencesR[i], left, top, left + width, top + height, frameR, classes)
             
     if len(centersR) > 0 and len(centersR) == len(centersL): # if the same number of objects detected in both frames
+        packet = bytes()
         for i in range(len(centersL)):
-            packet = bytes()
             if(centersL[i][0] == centersR[i][0]) and (centersL[i][0]==0): # checks if its the same object and if its a person
                 x_diff = abs(centersL[i][1]-centersR[i][1])
                 x_mean = centersR[i][1] + x_diff/2 - frame_width/2
-                depth = int((420/x_diff)*100)
+                depth = int((320/x_diff)*100)
                 angle = int((x_mean / 18) - 2)
                 if(angle<-45):
                     angle = -45
