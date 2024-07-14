@@ -123,56 +123,52 @@ while True:
         for detection in out:
             scores = detection[5:]
             class_id = np.argmax(scores)
-            if(class_id==0): # if it detects a person
-                confidence = scores[class_id]
-                if confidence > conf_threshold:
-                    center_x = int(detection[0] * frame_widthL)
-                    center_y = int(detection[1] * frame_heightL)
-                    width = int(detection[2] * frame_widthL)
-                    height = int(detection[3] * frame_heightL)
-                    left = int(center_x - width / 2)
-                    top = int(center_y - height / 2)
-                    class_idsL.append(class_id)
-                    confidencesL.append(float(confidence))
-                    boxesL.append([left, top, width, height])
+            confidence = scores[class_id]
+            if confidence > conf_threshold:
+                center_x = int(detection[0] * frame_widthL)
+                center_y = int(detection[1] * frame_heightL)
+                width = int(detection[2] * frame_widthL)
+                height = int(detection[3] * frame_heightL)
+                left = int(center_x - width / 2)
+                top = int(center_y - height / 2)
+                class_idsL.append(class_id)
+                confidencesL.append(float(confidence))
+                boxesL.append([left, top, width, height])
 
     # Apply non-maxima suppression for left frame
     indicesL = cv.dnn.NMSBoxes(boxesL, confidencesL, conf_threshold, nms_threshold)
     if len(indicesL) > 0:
         for i in indicesL.flatten():
-            if (class_idsL[i]==0):
-                box = boxesL[i]
-                left, top, width, height = box
-                centersL.append([class_idsL[i],left+(width/2)])
-                draw_pred(class_idsL[i], confidencesL[i], left, top, left + width, top + height, frameL, classes)
+            box = boxesL[i]
+            left, top, width, height = box
+            centersL.append([class_idsL[i],left+(width/2)])
+            draw_pred(class_idsL[i], confidencesL[i], left, top, left + width, top + height, frameL, classes)
 
     # Process detections for right frame
     for out in outsR:
         for detection in out:
             scores = detection[5:]
             class_id = np.argmax(scores)
-            if (class_id==0): # if it detects a person
-                confidence = scores[class_id]
-                if confidence > conf_threshold:
-                    center_x = int(detection[0] * frame_widthR)
-                    center_y = int(detection[1] * frame_heightR)
-                    width = int(detection[2] * frame_widthR)
-                    height = int(detection[3] * frame_heightR)
-                    left = int(center_x - width / 2)
-                    top = int(center_y - height / 2)
-                    class_idsR.append(class_id)
-                    confidencesR.append(float(confidence))
-                    boxesR.append([left, top, width, height])
+            confidence = scores[class_id]
+            if confidence > conf_threshold:
+                center_x = int(detection[0] * frame_widthR)
+                center_y = int(detection[1] * frame_heightR)
+                width = int(detection[2] * frame_widthR)
+                height = int(detection[3] * frame_heightR)
+                left = int(center_x - width / 2)
+                top = int(center_y - height / 2)
+                class_idsR.append(class_id)
+                confidencesR.append(float(confidence))
+                boxesR.append([left, top, width, height])
 
     # Apply non-maxima suppression for right frame
     indicesR = cv.dnn.NMSBoxes(boxesR, confidencesR, conf_threshold, nms_threshold)
     if len(indicesR) > 0:
         for i in indicesR:
-            if (class_idsR[i]==0): # if a person
-                box = boxesR[i]
-                left, top, width, height = box
-                centersR.append([class_idsR[i],left+(width/2)])
-                draw_pred(class_idsR[i], confidencesR[i], left, top, left + width, top + height, frameR, classes)
+            box = boxesR[i]
+            left, top, width, height = box
+            centersR.append([class_idsR[i],left+(width/2)])
+            draw_pred(class_idsR[i], confidencesR[i], left, top, left + width, top + height, frameR, classes)
             
     if len(centersR) > 0 and len(centersR) == len(centersL): # if the same number of objects detected in both frames
         for i in range(len(centersL)):
@@ -180,19 +176,19 @@ while True:
             if(centersL[i][0] == centersR[i][0]) and (centersL[i][0]==0): # checks if its the same object and if its a person
                 x_diff = abs(centersL[i][1]-centersR[i][1])
                 x_mean = centersR[i][1] + x_diff/2 - frame_width/2
-                depth = int((420/x_diff)*100)
-                angle = int((x_mean / 18) - 2)
-                if(angle<-45):
-                    angle = -45
-                scaled_angle = angle+45 # scaling this to a positive number to transmit to bbg and then will be scaled down on bbg side
+                depth = int((270/x_diff)*100)
+                angle = int(x_mean /16)
+                if(angle<-30):
+                    angle = -30
+                scaled_angle = angle+30 # scaling this to a positive number to transmit to bbg and then will be scaled down on bbg side
                 scaled_depth = int(depth/10) if (depth<2550) else int(255)
                 print("person" + str(i) + " detected at: " +  str(depth) + "cm from launcher at: " + str(angle) + " degrees")
                 packet+=scaled_depth.to_bytes(1,byteorder="big") +scaled_angle.to_bytes(1,byteorder="big")
             if packet:
                 ser.write(packet)
 
-   # cv.imshow("Object Detection Left", frameL)
-   # cv.imshow("Object Detection Right", frameR)
+    cv.imshow("Object Detection Left", frameL)
+    cv.imshow("Object Detection Right", frameR)
 
     if cv.waitKey(1) >= 0:
         break

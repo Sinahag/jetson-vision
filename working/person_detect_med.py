@@ -95,6 +95,7 @@ R = np.eye(3)
 T = np.zeros((3, 1))
 R1, R2, P1, P2, Q = [np.eye(3) for _ in range(5)]
 frame_width = 1280
+transmit_counter=0
 
 while True:
     retL, frameL = capL.read()
@@ -188,8 +189,10 @@ while True:
                 scaled_depth = int(depth/10) if (depth<2550) else int(255)
                 print("person" + str(i) + " detected at: " +  str(depth) + "cm from launcher at: " + str(angle) + " degrees")
                 packet+=scaled_depth.to_bytes(1,byteorder="big") +scaled_angle.to_bytes(1,byteorder="big")
-            if packet:
+                transmit_counter+=1
+            if packet and transmit_counter>=5:
                 ser.write(packet)
+                transmit_counter=0
 
    # cv.imshow("Object Detection Left", frameL)
    # cv.imshow("Object Detection Right", frameR)
