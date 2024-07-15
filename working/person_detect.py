@@ -2,6 +2,7 @@ import cv2 as cv
 import numpy as np
 import serial
 import struct
+import math
 
 serial_port = '/dev/ttyTHS1'
 baud_rate=9600
@@ -177,7 +178,7 @@ while True:
     if len(centersR) > 0 and len(centersR) == len(centersL): # if the same number of objects detected in both frames
         for i in range(len(centersL)):
             packet = bytes()
-            if(centersL[i][0] == centersR[i][0]) and (centersL[i][0]==0): # checks if its the same object and if its a person
+            if(centersL[i][0] == centersR[i][0]) and (centersL[i][0]==0) and (i == math.floor(len(centersL)/2)): # checks if its the same object and if its a person
                 x_diff = abs(centersL[i][1]-centersR[i][1])
                 x_mean = centersR[i][1] + x_diff/2 - frame_width/2
                 depth = int((420/x_diff)*100)
