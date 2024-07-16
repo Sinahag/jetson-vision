@@ -181,7 +181,7 @@ while True:
             if(centersL[i][0] == centersR[i][0]) and (centersL[i][0]==0) and (i == math.floor(len(centersL)/2)): # checks if its the same object and if its a person
                 x_diff = abs(centersL[i][1]-centersR[i][1])
                 x_mean = centersR[i][1] + x_diff/2 - frame_width/2
-                depth = int((420/x_diff)*100)
+                depth = int((290/x_diff)*100)
                 angle = int((x_mean / 18) - 2)
                 if(angle<-45):
                     angle = -45

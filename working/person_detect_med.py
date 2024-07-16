@@ -2,6 +2,7 @@ import cv2 as cv
 import numpy as np
 import serial
 import struct
+import math 
 
 serial_port = '/dev/ttyTHS1'
 baud_rate=9600
@@ -12,6 +13,14 @@ ser = serial.Serial(serial_port,baud_rate,timeout=1)
 def get_output_names(net):
     layers_names = net.getLayerNames()
     return [layers_names[i - 1] for i in net.getUnconnectedOutLayers()]
+
+def update_history(history_dict, personID, value):
+    last_update[personID]=0
+    if personID in history_dict:
+        history_dict[personID].append(value)
+        history_dict[personID] = history_dict[personID][-5:]
+    else:
+        history_dict[personID] = [value]
 
 def gstreamer_pipeline(
     sensor_id=0,
@@ -95,7 +104,9 @@ R = np.eye(3)
 T = np.zeros((3, 1))
 R1, R2, P1, P2, Q = [np.eye(3) for _ in range(5)]
 frame_width = 1280
-transmit_counter=0
+history_depth = dict()
+history_angle = dict()
+last_update = {0:0,1:0,2:0}
 
 while True:
     retL, frameL = capL.read()
@@ -111,7 +122,7 @@ while True:
     net.setInput(blobR)
     outsR = net.forward(get_output_names(net))
 
-    conf_threshold = 0.5 # minimum confidence for detected object to be drawn around
+    conf_threshold = 0.7 # minimum confidence for detected object to be drawn around
     nms_threshold = 0.4
     frame_heightL, frame_widthL = frameL.shape[:2]
     frame_heightR, frame_widthR = frameR.shape[:2]
@@ -144,7 +155,7 @@ while True:
             if (class_idsL[i]==0):
                 box = boxesL[i]
                 left, top, width, height = box
-                centersL.append([class_idsL[i],left+(width/2)])
+                centersL.append([left+(width/2), width, height])
                 draw_pred(class_idsL[i], confidencesL[i], left, top, left + width, top + height, frameL, classes)
 
     # Process detections for right frame
@@ -172,30 +183,43 @@ while True:
             if (class_idsR[i]==0): # if a person
                 box = boxesR[i]
                 left, top, width, height = box
-                centersR.append([class_idsR[i],left+(width/2)])
+                centersR.append([left+(width/2), width, height])
                 draw_pred(class_idsR[i], confidencesR[i], left, top, left + width, top + height, frameR, classes)
             
     if len(centersR) > 0 and len(centersR) == len(centersL): # if the same number of objects detected in both frames
-        packet = bytes()
+        for i in range(3):
+            last_update[i]+=1
+            if last_update[i]>4:
+                history_angle[i] = []
+                history_depth[i] = []
+                last_update[i]=0
+                
         for i in range(len(centersL)):
-            if(centersL[i][0] == centersR[i][0]) and (centersL[i][0]==0): # checks if its the same object and if its a person
-                x_diff = abs(centersL[i][1]-centersR[i][1])
-                x_mean = centersR[i][1] + x_diff/2 - frame_width/2
-                depth = int((320/x_diff)*100)
-                angle = int((x_mean / 18) - 2)
-                if(angle<-45):
-                    angle = -45
-                scaled_angle = angle+45 # scaling this to a positive number to transmit to bbg and then will be scaled down on bbg side
-                scaled_depth = int(depth/10) if (depth<2550) else int(255)
-                print("person" + str(i) + " detected at: " +  str(depth) + "cm from launcher at: " + str(angle) + " degrees")
-                packet+=scaled_depth.to_bytes(1,byteorder="big") +scaled_angle.to_bytes(1,byteorder="big")
-                transmit_counter+=1
-            if packet and transmit_counter>=5:
+            packet = bytes()
+            # the following filters out edge detected terms
+            if float(centersL[i][1]/centersR[i][1]) < 0.75  or float(centersL[i][1]/centersR[i][1]) > 1.33 or float(centersL[i][2]/centersR[i][2]) < 0.75 or float(centersL[i][2]/centersR[i][2]) > 1.33:
+                break
+            x_diff = abs(centersL[i][0]-centersR[i][0])
+            if x_diff == 0:
+                break
+            # focal length is 2599 pixels for imx219-77 with 1/4inch cmos sensor
+            x_mean = centersR[i][0] + x_diff/2 - frame_width/2
+            angle = int((x_mean / 18) - 2)
+            depth = int(2599*21/x_diff)
+            update_history(history_depth,i,depth)
+            if(angle<-45):
+                angle = -45
+            update_history(history_angle,i,angle)
+            scaled_angle = int(sum(history_angle[i])/len(history_angle[i])) + 45 # scaling this to a positive number to transmit to bbg and then will be scaled down on bbg side
+            avg_depth = sum(history_depth[i])/len(history_depth[i])
+            scaled_depth = int(avg_depth/10) if (avg_depth<2550) else int(255)
+            print("person" + str(i) + " detected at: " +  str(int(avg_depth)) + "cm from launcher at: " + str(angle) + " degrees")
+            packet+=scaled_depth.to_bytes(1,byteorder="big") +scaled_angle.to_bytes(1,byteorder="big")
+            if packet:
                 ser.write(packet)
-                transmit_counter=0
 
-   # cv.imshow("Object Detection Left", frameL)
-   # cv.imshow("Object Detection Right", frameR)
+    cv.imshow("Object Detection Left", frameL)
+    cv.imshow("Object Detection Right", frameR)
 
     if cv.waitKey(1) >= 0:
         break
