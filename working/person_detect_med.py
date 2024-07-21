@@ -205,7 +205,7 @@ while True:
             # focal length is 2599 pixels for imx219-77 with 1/4inch cmos sensor
             x_mean = centersR[i][0] + x_diff/2 - frame_width/2
             angle = int((x_mean / 18) - 2)
-            depth = int(2599*21/x_diff)
+            depth = int(2599*12/x_diff)
             update_history(history_depth,i,depth)
             if(angle<-45):
                 angle = -45
